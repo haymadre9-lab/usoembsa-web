@@ -4,7 +4,7 @@
 // ═══════════════════════════════════════════════════════════════
 window.USOEMBSA_CONFIG = {
   // TODO: pega tu URL de Supabase (sin barra al final)
-  SUPABASE_URL: "https://ewacvknaabxwhrsbbjer.supabase.co/rest/v1",
+  SUPABASE_URL: "https://ewacvknaabxwhrsbbjer.supabase.co",
 
   // TODO: pega tu clave publishable o anon
   SUPABASE_KEY: "sb_publishable_i5CzVcO6_4y308oHJWvPTA_5b45frpO",
