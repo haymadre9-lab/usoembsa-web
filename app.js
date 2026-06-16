@@ -434,19 +434,42 @@ route('convenio', async () => {
   const node = el(`<div class="screen">
     <div class="appbar"><button id="back">‹</button><h1>Convenio</h1>
       <button id="aiBtn" title="Preguntar a la IA">✨</button></div>
+    <div style="padding:12px 16px 0">
+      <input id="cvSearch" placeholder="🔍 Buscar en el convenio…"
+        style="width:100%;padding:12px 16px;border-radius:20px;border:1px solid var(--outline);
+        background:var(--surface);color:var(--on-bg);font-size:15px">
+    </div>
     <div class="content" id="cont"><div class="loading-full"><div class="spinner dark"></div></div></div>
   </div>`);
   render(node);
   node.querySelector('#back').onclick = () => go('main');
   node.querySelector('#aiBtn').onclick = () => go('ia');
   const cont = node.querySelector('#cont');
-  try {
-    const rows = await SB.select('convenio_articulos', `select=*&order=created_at.asc`);
+  const search = node.querySelector('#cvSearch');
+
+  let allRows = [];
+  function paint(filter=''){
+    const q = filter.trim().toLowerCase();
+    const rows = q ? allRows.filter(r =>
+      (r.title||'').toLowerCase().includes(q) || (r.body||'').toLowerCase().includes(q)
+    ) : allRows;
     cont.innerHTML='';
-    if (!rows.length) cont.appendChild(el(`<div class="empty">${ICONS.convenio}<p>No hay artículos del convenio aún.</p></div>`));
-    else { const list=el(`<div class="list"></div>`);
-      rows.forEach(r=>list.appendChild(renderItem(r,'convenio',()=>go('convenio')))); cont.appendChild(list); }
+    if (!rows.length) {
+      cont.appendChild(el(`<div class="empty">${ICONS.convenio}<p>${q?'Sin resultados para tu búsqueda.':'No hay artículos del convenio aún.'}</p></div>`));
+    } else {
+      const list=el(`<div class="list"></div>`);
+      rows.forEach(r=>list.appendChild(renderItem(r,'convenio',()=>go('convenio'))));
+      cont.appendChild(list);
+    }
+  }
+
+  try {
+    allRows = await SB.select('convenio_articulos', `select=*&order=created_at.asc`);
+    paint();
   } catch(e){ cont.innerHTML=''; cont.appendChild(el(`<div class="empty"><p>Error: ${esc(e.message)}</p></div>`)); }
+
+  let t;
+  search.oninput = () => { clearTimeout(t); t=setTimeout(()=>paint(search.value), 200); };
 
   if (canManage('convenio')) { const fab=el(`<button class="fab">＋</button>`);
     fab.onclick=()=>openAddModal('convenio',()=>go('convenio')); node.appendChild(fab); }
