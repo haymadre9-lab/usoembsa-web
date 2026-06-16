@@ -1,0 +1,14 @@
+{
+  "name": "USO emb",
+  "short_name": "USO emb",
+  "description": "App del comité USO de Ezkerraldea Meatzaldea Bus",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#FFFBFA",
+  "theme_color": "#C62828",
+  "orientation": "portrait",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
