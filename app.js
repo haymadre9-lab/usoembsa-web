@@ -63,6 +63,19 @@ const SB = {
     if (!r.ok) throw new Error(data.error || `Error ${r.status}`);
     return data.answer;
   },
+  // Carpetas personalizadas
+  async getFolders() {
+    return this.select('custom_folders', 'select=*&order=created_at.asc');
+  },
+  async createFolder(title) {
+    const key = 'custom_' + Date.now().toString(36) + Math.random().toString(36).slice(2,6);
+    return this.insert('custom_folders', { cat_key:key, title });
+  },
+  async deleteFolder(id, catKey) {
+    // Borra la carpeta y todo su contenido asociado
+    await this.del('content_items', `category=eq.${encodeURIComponent(catKey)}`).catch(()=>{});
+    await this.del('custom_folders', `id=eq.${id}`);
+  },
 };
 
 // ─────────────────────────── Auth (localStorage) ────────────────────────
@@ -129,13 +142,22 @@ function catLabel(cat){ if(cat.startsWith('calendarios')) return 'CALENDARIOS';
 function catIcon(cat){ if(cat.startsWith('calendarios')) return 'calendarios';
   return (CAT_META[cat]||{icon:'contactos'}).icon; }
 
-// ¿Puede el usuario añadir/borrar en esta categoría?
-//  - Quejas: siempre (buzón abierto a todos)
-//  - Resto: solo en modo gestión (entrando a Privado con contraseña)
-function canManage(cat){
-  if (cat === 'quejas') return true;
+// ¿Puede el usuario AÑADIR contenido en esta categoría?
+//  - Quejas y Bus/Avería: cualquiera (buzones abiertos)
+//  - Resto: solo en modo gestión (contraseña de Privado)
+function canAdd(cat){
+  if (cat === 'quejas' || cat === 'pic') return true;
   return Auth.manageMode;
 }
+
+// ¿Puede el usuario BORRAR contenido en esta categoría?
+//  - Borrar SIEMPRE requiere modo gestión, en todas las secciones.
+function canDelete(cat){
+  return Auth.manageMode;
+}
+
+// Compatibilidad: canManage = puede añadir (se usa para mostrar el botón +)
+function canManage(cat){ return canAdd(cat); }
 
 // ─────────────────────────── Router ─────────────────────────────────────
 const routes = {};
@@ -232,6 +254,17 @@ route('main', async () => {
     grid.appendChild(card);
   });
 
+  // Carpetas personalizadas (creadas desde Privado). Visibles para todos.
+  try {
+    const folders = await SB.getFolders();
+    folders.forEach(f => {
+      const card = el(`<button class="card" style="color:var(--gris)">
+        ${ICONS.contactos}<div class="label">${esc(f.title)}</div></button>`);
+      card.onclick = () => go('list', { cat:f.cat_key, title:f.title });
+      grid.appendChild(card);
+    });
+  } catch(e){ console.warn('folders', e); }
+
   // Actividad reciente
   try {
     const recent = await loadRecent();
@@ -274,9 +307,11 @@ async function loadRecent(){
 // ─────────────────────────── Pantalla LISTA genérica ────────────────────
 route('list', async (params) => {
   const cat = params?.cat || 'quejas';
-  const meta = CAT_META[cat] || { name:cat.toUpperCase() };
+  const customTitle = params?.title;
+  const meta = CAT_META[cat] || { name: customTitle || cat.toUpperCase() };
+  const titulo = customTitle || (meta.name.charAt(0)+meta.name.slice(1).toLowerCase());
   const node = el(`<div class="screen">
-    <div class="appbar"><button id="back">‹</button><h1>${esc(meta.name.charAt(0)+meta.name.slice(1).toLowerCase())}</h1></div>
+    <div class="appbar"><button id="back">‹</button><h1>${esc(titulo)}</h1></div>
     <div class="content" id="list"><div class="loading-full"><div class="spinner dark"></div></div></div>
   </div>`);
   render(node);
@@ -309,16 +344,16 @@ route('list', async (params) => {
 });
 
 function renderItem(r, cat, reload){
-  const puedeGestionar = canManage(cat);
+  const puedeBorrar = canDelete(cat);
   const item = el(`<div class="item">
-    ${puedeGestionar?`<button class="it-del">Borrar</button>`:''}
+    ${puedeBorrar?`<button class="it-del">Borrar</button>`:''}
     <div class="it-cat">${catLabel(cat)}</div>
     <div class="it-title">${esc(r.title||'(sin título)')}</div>
     ${r.body?`<div class="it-body">${esc(r.body)}</div>`:''}
     ${r.file_url?`<a class="it-file" href="${esc(r.file_url)}" target="_blank" rel="noopener">📎 ${esc(r.file_name||'Ver archivo')}</a>`:''}
     <div class="it-date">${esc(r.date_text||'')} ${r.uploader?'· '+esc(r.uploader):''}</div>
   </div>`);
-  if (puedeGestionar) {
+  if (puedeBorrar) {
     item.querySelector('.it-del').onclick = async () => {
       if(!confirm('¿Borrar este elemento?')) return;
       try { await SB.del('content_items', `id=eq.${r.id}`); toast('Borrado'); reload(); }
@@ -560,6 +595,40 @@ route('privado', async () => {
       const info = el(`<div style="padding:14px 16px 0;color:var(--on-var);font-size:14px">
         ✅ Modo gestión activo. Ya puedes añadir y borrar contenido en todas las secciones.</div>`);
       cont.appendChild(info);
+
+      // ── Gestor de carpetas de la pantalla de inicio ──
+      const folderBox = el(`<div style="padding:16px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+          <b style="font-size:16px">Carpetas de inicio</b>
+          <button id="newFolder" class="btn" style="width:auto;padding:8px 16px;font-size:14px">＋ Nueva</button>
+        </div>
+        <div id="folderList"></div>
+      </div>`);
+      cont.appendChild(folderBox);
+      folderBox.querySelector('#newFolder').onclick = () => openNewFolderModal(reload);
+      try {
+        const folders = await SB.getFolders();
+        const fl = folderBox.querySelector('#folderList');
+        if (!folders.length) {
+          fl.appendChild(el(`<div style="color:var(--on-var);font-size:14px">No has creado carpetas aún.</div>`));
+        } else {
+          folders.forEach(f => {
+            const row = el(`<div class="item" style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px">
+              <span style="font-weight:600">${esc(f.title)}</span>
+              <button class="it-del" style="float:none">Borrar</button>
+            </div>`);
+            row.querySelector('.it-del').onclick = async () => {
+              if(!confirm(`¿Borrar la carpeta "${f.title}" y todo su contenido?`)) return;
+              try { await SB.deleteFolder(f.id, f.cat_key); toast('Carpeta borrada'); reload(); }
+              catch(e){ toast('Error al borrar'); }
+            };
+            fl.appendChild(row);
+          });
+        }
+      } catch(e){ console.warn('folders', e); }
+
+      // ── Contenido de la sección Privado ──
+      cont.appendChild(el(`<div class="section-title" style="padding-top:8px">Contenido privado</div>`));
       if(!rows.length) cont.appendChild(el(`<div class="empty">${ICONS.privado}<p>Zona privada vacía.</p></div>`));
       else { const list=el(`<div class="list"></div>`);
         rows.forEach(r=>list.appendChild(renderItem(r,'privado',reload))); cont.appendChild(list); }
@@ -568,6 +637,33 @@ route('privado', async () => {
   await reload();
   const fab=el(`<button class="fab">＋</button>`); fab.onclick=()=>openAddModal('privado',reload); node.appendChild(fab);
 });
+
+// Modal para crear una carpeta nueva
+function openNewFolderModal(reload){
+  const bg = el(`<div class="modal-bg"><div class="modal">
+    <h3>Nueva carpeta</h3>
+    <input id="fName" placeholder="Nombre de la carpeta" autocomplete="off">
+    <div class="err" id="fErr"></div>
+    <div class="modal-actions">
+      <button class="btn btn-sec" id="fCancel">Cancelar</button>
+      <button class="btn" id="fSave">Crear</button>
+    </div>
+  </div></div>`);
+  document.body.appendChild(bg);
+  const close = () => bg.remove();
+  bg.onclick = e => { if(e.target===bg) close(); };
+  bg.querySelector('#fCancel').onclick = close;
+  bg.querySelector('#fName').focus();
+  bg.querySelector('#fSave').onclick = async () => {
+    const name = bg.querySelector('#fName').value.trim();
+    const err = bg.querySelector('#fErr');
+    if (name.length < 2) { err.textContent='Escribe un nombre.'; return; }
+    const btn = bg.querySelector('#fSave');
+    btn.disabled=true; btn.innerHTML='<span class="spinner"></span>';
+    try { await SB.createFolder(name); toast('Carpeta creada'); close(); reload(); }
+    catch(e){ err.textContent='Error: '+e.message; btn.disabled=false; btn.textContent='Crear'; }
+  };
+}
 
 // ─────────────────────────── Arranque ───────────────────────────────────
 if (CFG.SUPABASE_URL.includes('REEMPLAZAR')) {
