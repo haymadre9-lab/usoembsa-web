@@ -1,6 +1,6 @@
 // Service Worker básico: cachea el "cascarón" de la app para que abra offline.
 // Los datos (Supabase) siempre se piden a la red.
-const CACHE = 'usoembsa-v1';
+const CACHE = 'usoembsa-v2';
 const SHELL = ['./','./index.html','./app.js','./icons.js','./config.js',
                './manifest.webmanifest','./icon-192.png','./icon-512.png'];
 
