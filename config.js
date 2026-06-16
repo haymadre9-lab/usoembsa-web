@@ -15,4 +15,5 @@ window.USOEMBSA_CONFIG = {
   // Matrícula del administrador y PIN de emergencia (igual que en Android)
   PERMANENT_MATRICULA: "5851",
   EMERGENCY_PIN: "230176",
+  PRIVADO_PASSWORD: "UsoEmbsa",
 };
