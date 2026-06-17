@@ -76,6 +76,16 @@ const SB = {
     await this.del('content_items', `category=eq.${encodeURIComponent(catKey)}`).catch(()=>{});
     await this.del('custom_folders', `id=eq.${id}`);
   },
+  // Matrículas permitidas
+  async getMatriculas() {
+    return this.select('matriculas_allowed', 'select=*&order=matricula.asc');
+  },
+  async addMatricula(matricula) {
+    return this.insert('matriculas_allowed', { matricula: matricula.trim().toUpperCase() });
+  },
+  async deleteMatricula(id) {
+    return this.del('matriculas_allowed', `id=eq.${id}`);
+  },
 };
 
 // ─────────────────────────── Auth (localStorage) ────────────────────────
@@ -675,6 +685,43 @@ route('privado', async () => {
         }
       } catch(e){ console.warn('folders', e); }
 
+      // ── Gestor de matrículas permitidas ──
+      const matBox = el(`<div style="padding:0 16px 16px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+          <b style="font-size:16px">Matrículas permitidas</b>
+          <button id="newMat" class="btn" style="width:auto;padding:8px 16px;font-size:14px">＋ Añadir</button>
+        </div>
+        <div id="matList"></div>
+      </div>`);
+      cont.appendChild(matBox);
+      matBox.querySelector('#newMat').onclick = () => openNewMatriculaModal(reload);
+      try {
+        const mats = await SB.getMatriculas();
+        const ml = matBox.querySelector('#matList');
+        if (!mats.length) {
+          ml.appendChild(el(`<div style="color:var(--on-var);font-size:14px">No hay matrículas registradas.</div>`));
+        } else {
+          // Mostrarlas como "chips" en una rejilla compacta
+          const wrap = el(`<div style="display:flex;flex-wrap:wrap;gap:8px"></div>`);
+          mats.forEach(m => {
+            const esAdmin = m.matricula === CFG.PERMANENT_MATRICULA;
+            const chip = el(`<div style="display:flex;align-items:center;gap:6px;background:var(--surface-var);
+              padding:6px 10px;border-radius:16px;font-size:14px;font-weight:600">
+              <span>${esc(m.matricula)}</span>
+              ${esAdmin?'':`<button class="matDel" style="color:var(--rojo);font-weight:700;font-size:16px;line-height:1">×</button>`}
+            </div>`);
+            const del = chip.querySelector('.matDel');
+            if (del) del.onclick = async () => {
+              if(!confirm(`¿Quitar la matrícula ${m.matricula}?`)) return;
+              try { await SB.deleteMatricula(m.id); toast('Matrícula eliminada'); reload(); }
+              catch(e){ toast('Error al eliminar'); }
+            };
+            wrap.appendChild(chip);
+          });
+          ml.appendChild(wrap);
+        }
+      } catch(e){ console.warn('matriculas', e); }
+
       // ── Contenido de la sección Privado ──
       cont.appendChild(el(`<div class="section-title" style="padding-top:8px">Contenido privado</div>`));
       if(!rows.length) cont.appendChild(el(`<div class="empty">${ICONS.privado}<p>Zona privada vacía.</p></div>`));
@@ -710,6 +757,38 @@ function openNewFolderModal(reload){
     btn.disabled=true; btn.innerHTML='<span class="spinner"></span>';
     try { await SB.createFolder(name); toast('Carpeta creada'); close(); reload(); }
     catch(e){ err.textContent='Error: '+e.message; btn.disabled=false; btn.textContent='Crear'; }
+  };
+}
+
+// Modal para añadir una matrícula nueva
+function openNewMatriculaModal(reload){
+  const bg = el(`<div class="modal-bg"><div class="modal">
+    <h3>Añadir matrícula</h3>
+    <input id="mName" inputmode="numeric" placeholder="Número de matrícula" autocomplete="off">
+    <div class="err" id="mErr"></div>
+    <div class="modal-actions">
+      <button class="btn btn-sec" id="mCancel">Cancelar</button>
+      <button class="btn" id="mSave">Añadir</button>
+    </div>
+  </div></div>`);
+  document.body.appendChild(bg);
+  const close = () => bg.remove();
+  bg.onclick = e => { if(e.target===bg) close(); };
+  bg.querySelector('#mCancel').onclick = close;
+  bg.querySelector('#mName').focus();
+  bg.querySelector('#mSave').onclick = async () => {
+    const val = bg.querySelector('#mName').value.trim();
+    const err = bg.querySelector('#mErr');
+    if (val.length < 1) { err.textContent='Escribe una matrícula.'; return; }
+    const btn = bg.querySelector('#mSave');
+    btn.disabled=true; btn.innerHTML='<span class="spinner"></span>';
+    try { await SB.addMatricula(val); toast('Matrícula añadida'); close(); reload(); }
+    catch(e){
+      // Si ya existe (UNIQUE), avisar amablemente
+      const msg = e.message.includes('409') || e.message.includes('duplicate')
+        ? 'Esa matrícula ya estaba registrada.' : 'Error: '+e.message;
+      err.textContent = msg; btn.disabled=false; btn.textContent='Añadir';
+    }
   };
 }
 
