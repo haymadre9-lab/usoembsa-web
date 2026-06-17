@@ -448,10 +448,13 @@ route('convenio', async () => {
   const search = node.querySelector('#cvSearch');
 
   let allRows = [];
+  // Normaliza: minúsculas y sin tildes, para que "articulo" encuentre "artículo"
+  const norm = s => (s||'').toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g,'');
   function paint(filter=''){
-    const q = filter.trim().toLowerCase();
+    const q = norm(filter.trim());
     const rows = q ? allRows.filter(r =>
-      (r.title||'').toLowerCase().includes(q) || (r.body||'').toLowerCase().includes(q)
+      norm(r.title).includes(q) || norm(r.body).includes(q)
     ) : allRows;
     cont.innerHTML='';
     if (!rows.length) {
@@ -697,3 +700,4 @@ if (CFG.SUPABASE_URL.includes('REEMPLAZAR')) {
 } else {
   handleRoute();
 }
+
