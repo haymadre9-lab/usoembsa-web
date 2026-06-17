@@ -343,13 +343,35 @@ route('list', async (params) => {
   }
 });
 
-function renderItem(r, cat, reload){
+// Resalta en amarillo las apariciones de `term` dentro de un texto,
+// respetando tildes (busca sin tilde pero marca el texto original).
+function highlightText(text, term){
+  const safe = esc(text || '');
+  if (!term) return safe;
+  const norm = s => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  const nText = norm(safe);
+  const nTerm = norm(term.trim());
+  if (!nTerm) return safe;
+  let out = '', i = 0;
+  while (i < safe.length) {
+    const idx = nText.indexOf(nTerm, i);
+    if (idx === -1) { out += safe.slice(i); break; }
+    out += safe.slice(i, idx);
+    out += '<mark class="hl">' + safe.slice(idx, idx + nTerm.length) + '</mark>';
+    i = idx + nTerm.length;
+  }
+  return out;
+}
+
+function renderItem(r, cat, reload, highlight=''){
   const puedeBorrar = canDelete(cat);
+  const titleHtml = highlight ? highlightText(r.title||'(sin título)', highlight) : esc(r.title||'(sin título)');
+  const bodyHtml  = highlight ? highlightText(r.body||'', highlight) : esc(r.body||'');
   const item = el(`<div class="item">
     ${puedeBorrar?`<button class="it-del">Borrar</button>`:''}
     <div class="it-cat">${catLabel(cat)}</div>
-    <div class="it-title">${esc(r.title||'(sin título)')}</div>
-    ${r.body?`<div class="it-body">${esc(r.body)}</div>`:''}
+    <div class="it-title">${titleHtml}</div>
+    ${r.body?`<div class="it-body">${bodyHtml}</div>`:''}
     ${r.file_url?`<a class="it-file" href="${esc(r.file_url)}" target="_blank" rel="noopener">📎 ${esc(r.file_name||'Ver archivo')}</a>`:''}
     <div class="it-date">${esc(r.date_text||'')} ${r.uploader?'· '+esc(r.uploader):''}</div>
   </div>`);
@@ -461,7 +483,7 @@ route('convenio', async () => {
       cont.appendChild(el(`<div class="empty">${ICONS.convenio}<p>${q?'Sin resultados para tu búsqueda.':'No hay artículos del convenio aún.'}</p></div>`));
     } else {
       const list=el(`<div class="list"></div>`);
-      rows.forEach(r=>list.appendChild(renderItem(r,'convenio',()=>go('convenio'))));
+      rows.forEach(r=>list.appendChild(renderItem(r,'convenio',()=>go('convenio'), filter)));
       cont.appendChild(list);
     }
   }
@@ -700,4 +722,3 @@ if (CFG.SUPABASE_URL.includes('REEMPLAZAR')) {
 } else {
   handleRoute();
 }
-
