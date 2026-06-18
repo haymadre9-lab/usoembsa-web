@@ -169,6 +169,20 @@ function canDelete(cat){
 // Compatibilidad: canManage = puede añadir (se usa para mostrar el botón +)
 function canManage(cat){ return canAdd(cat); }
 
+// Elige un icono temático para una carpeta personalizada según su nombre.
+// Si no detecta ningún tema conocido, usa el de contactos por defecto.
+function folderIcon(title){
+  const t = (title||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  if (/(bus|manual|vehiculo|coche|conduc)/.test(t)) return ICONS.manual;
+  if (/(clima|aire|calor|frio|temperatura|ac\b|a\/c)/.test(t)) return ICONS.clima;
+  if (/(servicio|personal|rrhh|recursos|plantilla|turno)/.test(t)) return ICONS.servicio;
+  if (/(contacto|telefono|agenda|directorio)/.test(t)) return ICONS.contactos;
+  if (/(calendar|horario|cuadrante)/.test(t)) return ICONS.calendarios;
+  if (/(acta|reunion|documento)/.test(t)) return ICONS.actas;
+  if (/(nomina|sueldo|salario|paga)/.test(t)) return ICONS.nominas;
+  return ICONS.contactos;
+}
+
 // ─────────────────────────── Router ─────────────────────────────────────
 const routes = {};
 function route(name, fn){ routes[name]=fn; }
@@ -269,7 +283,7 @@ route('main', async () => {
     const folders = await SB.getFolders();
     folders.forEach(f => {
       const card = el(`<button class="card" style="color:var(--gris)">
-        ${ICONS.contactos}<div class="label">${esc(f.title)}</div></button>`);
+        ${folderIcon(f.title)}<div class="label">${esc(f.title)}</div></button>`);
       card.onclick = () => go('list', { cat:f.cat_key, title:f.title });
       grid.appendChild(card);
     });
