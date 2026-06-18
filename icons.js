@@ -1,6 +1,61 @@
 // Iconos SVG con gradientes y relieve, equivalentes a los de la app Android.
 // Cada función devuelve un string SVG de 48x48 (escalable).
 window.ICONS = {
+  // ─── Iconos temáticos para carpetas personalizadas ───
+  manual: `<svg viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+    <defs><linearGradient id="mn1" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#5C6BC0"/><stop offset="1" stop-color="#283593"/></linearGradient></defs>
+    <path fill="#00000022" d="M11 9h27a2 2 0 0 1 2 2v31H13a2 2 0 0 1-2-2z"/>
+    <path fill="url(#mn1)" d="M10 8h26a3 3 0 0 1 3 3v29a2 2 0 0 1-2 2H12a2 2 0 0 1-2-2z"/>
+    <path fill="#ffffff3d" d="M10 8h26a3 3 0 0 1 3 3v3H10z"/>
+    <path fill="#1A237E" d="M10 8h4v34h-2a2 2 0 0 1-2-2z"/>
+    <path fill="#fff" d="M16 13h19v26H16z"/>
+    <!-- bus grande y claro dentro del libro -->
+    <path fill="#1E88E5" d="M19 20h13a1.5 1.5 0 0 1 1.5 1.5v8a1.5 1.5 0 0 1-1.5 1.5H19a1.5 1.5 0 0 1-1.5-1.5v-8A1.5 1.5 0 0 1 19 20z"/>
+    <path fill="#ffffff3d" d="M19 20h13a1.5 1.5 0 0 1 1.5 1.5v1H17.5v-1A1.5 1.5 0 0 1 19 20z"/>
+    <path fill="#BBDEFB" d="M19 23h5v3.5h-5zM25.5 23h6v3.5h-6z"/>
+    <path fill="#0D47A1" d="M18 27h15v1.5H18z"/>
+    <circle cx="21.5" cy="31" r="1.6" fill="#212121"/><circle cx="29.5" cy="31" r="1.6" fill="#212121"/>
+    <circle cx="21.5" cy="31" r=".6" fill="#fff"/><circle cx="29.5" cy="31" r=".6" fill="#fff"/>
+    <!-- líneas de texto del manual -->
+    <path stroke="#90A4AE" stroke-width="1.2" d="M19 35.5h13M19 37.5h9"/>
+  </svg>`,
+
+  clima: `<svg viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+    <defs><linearGradient id="cm1" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#E0F7FA"/><stop offset="1" stop-color="#80DEEA"/></linearGradient></defs>
+    <path fill="#00000022" d="M9 13h30a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H9z"/>
+    <path fill="url(#cm1)" d="M8 12h30a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V14a2 2 0 0 1 2-2z"/>
+    <path fill="#ffffff" d="M8 12h30a2 2 0 0 1 2 2v3H6v-3a2 2 0 0 1 2-2z"/>
+    <path stroke="#4DD0E1" stroke-width="1" d="M9 21h28M9 24h28"/>
+    <path fill="#00ACC1" d="M34 25h3v2h-3z"/>
+    <path fill="none" stroke="#26C6DA" stroke-width="1.6" stroke-linecap="round" d="M14 31v6M14 31l-2 2M14 31l2 2M14 37l-2-2M14 37l2-2"/>
+    <path fill="none" stroke="#26C6DA" stroke-width="1.6" stroke-linecap="round" d="M24 32v6M24 32l-2 2M24 32l2 2"/>
+    <path fill="none" stroke="#26C6DA" stroke-width="1.6" stroke-linecap="round" d="M34 31v6M34 31l-2 2M34 31l2 2M34 37l-2-2M34 37l2-2"/>
+  </svg>`,
+
+  servicio: `<svg viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+    <defs><linearGradient id="sv1" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#66BB6A"/><stop offset="1" stop-color="#2E7D32"/></linearGradient>
+      <linearGradient id="sv2" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#FFB74D"/><stop offset="1" stop-color="#E65100"/></linearGradient></defs>
+    <!-- bus que lleva a casa -->
+    <path fill="url(#sv1)" d="M5 20a3 3 0 0 1 3-3h20a3 3 0 0 1 3 3v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2z"/>
+    <path fill="#ffffff33" d="M5 20a3 3 0 0 1 3-3h20a3 3 0 0 1 3 3v2H5z"/>
+    <path fill="#C8E6C9" d="M7 19h9v6H7zM18 19h11v6H18z"/>
+    <path stroke="#2E7D32" stroke-width=".8" d="M22 19v6M26 19v6"/>
+    <path fill="#1B5E20" d="M8 29h4v7H8z"/>
+    <path fill="#E8F5E9" d="M14 30h15v2H14z"/>
+    <circle cx="11" cy="37" r="2.6" fill="#212121"/><circle cx="11" cy="37" r="1" fill="#9E9E9E"/>
+    <circle cx="27" cy="37" r="2.6" fill="#212121"/><circle cx="27" cy="37" r="1" fill="#9E9E9E"/>
+    <circle cx="6" cy="30" r="1" fill="#FFEB3B"/>
+    <!-- casa encima/al lado -->
+    <path fill="url(#sv2)" d="M37 18l8 7h-2v11h-12V25h-2z"/>
+    <path fill="#5D4037" d="M33 27h5v9h-5z"/>
+    <path fill="#FFE0B2" d="M40 28h2.5v3H40z"/>
+    <path fill="#3E2723" d="M34.5 31h2.5v5h-2.5z"/>
+  </svg>`,
+
   convenio: `<svg viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
     <defs><linearGradient id="cv1" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0" stop-color="#3B82F6"/><stop offset="1" stop-color="#0B3E91"/></linearGradient></defs>
