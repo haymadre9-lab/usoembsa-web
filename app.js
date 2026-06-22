@@ -63,29 +63,6 @@ const SB = {
     if (!r.ok) throw new Error(data.error || `Error ${r.status}`);
     return data.answer;
   },
-  // Carpetas personalizadas
-  async getFolders() {
-    return this.select('custom_folders', 'select=*&order=created_at.asc');
-  },
-  async createFolder(title) {
-    const key = 'custom_' + Date.now().toString(36) + Math.random().toString(36).slice(2,6);
-    return this.insert('custom_folders', { cat_key:key, title });
-  },
-  async deleteFolder(id, catKey) {
-    // Borra la carpeta y todo su contenido asociado
-    await this.del('content_items', `category=eq.${encodeURIComponent(catKey)}`).catch(()=>{});
-    await this.del('custom_folders', `id=eq.${id}`);
-  },
-  // Matrículas permitidas
-  async getMatriculas() {
-    return this.select('matriculas_allowed', 'select=*&order=matricula.asc');
-  },
-  async addMatricula(matricula) {
-    return this.insert('matriculas_allowed', { matricula: matricula.trim().toUpperCase() });
-  },
-  async deleteMatricula(id) {
-    return this.del('matriculas_allowed', `id=eq.${id}`);
-  },
 };
 
 // ─────────────────────────── Auth (localStorage) ────────────────────────
@@ -100,13 +77,7 @@ const Auth = {
   },
   get isLogged() { return !!this.matricula; },
   get isAdmin() { return this.matricula === CFG.PERMANENT_MATRICULA; },
-  // Modo gestión: se desbloquea al entrar en Privado con la contraseña.
-  // Dura toda la sesión (hasta cerrar sesión). Guardado en sessionStorage
-  // para que no persista entre cierres completos de la app.
-  get manageMode() { return sessionStorage.getItem('manage') === '1'; },
-  set manageMode(v) { if(v) sessionStorage.setItem('manage','1'); else sessionStorage.removeItem('manage'); },
-  checkPrivadoPassword(pw) { return pw === CFG.PRIVADO_PASSWORD; },
-  logout() { localStorage.removeItem('matricula'); sessionStorage.removeItem('manage'); },
+  logout() { localStorage.removeItem('matricula'); },
 };
 
 // ─────────────────────────── Categorías ─────────────────────────────────
@@ -123,6 +94,8 @@ const CALENDAR_SUBS = [
 const MENU = [
   { cat:'convenio',   title:'Convenio',  icon:'convenio',   color:'var(--azul)' },
   { cat:'calendarios',title:'Calendarios',icon:'calendarios',color:'var(--verde)' },
+  { cat:'turnos',     title:'Calendario de turnos',icon:'calendarios',color:'#3949AB', url:'https://haymadre9-lab.github.io/turnos-emb/' },
+  { cat:'turnos_apk', title:'Descargar APK',icon:'calendarios',color:'#2E7D32', url:'https://haymadre9-lab.github.io/turnos-emb/TurnosEMB.apk' },
   { cat:'actas',      title:'Actas',     icon:'actas',      color:'var(--naranja)' },
   { cat:'contactos',  title:'Contactos', icon:'contactos',  color:'var(--teal)' },
   { cat:'pic',        title:'Bus y Avería',icon:'pic',      color:'var(--violeta)' },
@@ -151,37 +124,6 @@ function catLabel(cat){ if(cat.startsWith('calendarios')) return 'CALENDARIOS';
   return (CAT_META[cat]||{name:cat.toUpperCase()}).name; }
 function catIcon(cat){ if(cat.startsWith('calendarios')) return 'calendarios';
   return (CAT_META[cat]||{icon:'contactos'}).icon; }
-
-// ¿Puede el usuario AÑADIR contenido en esta categoría?
-//  - Quejas y Bus/Avería: cualquiera (buzones abiertos)
-//  - Resto: solo en modo gestión (contraseña de Privado)
-function canAdd(cat){
-  if (cat === 'quejas' || cat === 'pic') return true;
-  return Auth.manageMode;
-}
-
-// ¿Puede el usuario BORRAR contenido en esta categoría?
-//  - Borrar SIEMPRE requiere modo gestión, en todas las secciones.
-function canDelete(cat){
-  return Auth.manageMode;
-}
-
-// Compatibilidad: canManage = puede añadir (se usa para mostrar el botón +)
-function canManage(cat){ return canAdd(cat); }
-
-// Elige un icono temático para una carpeta personalizada según su nombre.
-// Si no detecta ningún tema conocido, usa el de contactos por defecto.
-function folderIcon(title){
-  const t = (title||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
-  if (/(bus|manual|vehiculo|coche|conduc)/.test(t)) return ICONS.manual;
-  if (/(clima|aire|calor|frio|temperatura|ac\b|a\/c)/.test(t)) return ICONS.clima;
-  if (/(servicio|personal|rrhh|recursos|plantilla|turno)/.test(t)) return ICONS.servicio;
-  if (/(contacto|telefono|agenda|directorio)/.test(t)) return ICONS.contactos;
-  if (/(calendar|horario|cuadrante)/.test(t)) return ICONS.calendarios;
-  if (/(acta|reunion|documento)/.test(t)) return ICONS.actas;
-  if (/(nomina|sueldo|salario|paga)/.test(t)) return ICONS.nominas;
-  return ICONS.contactos;
-}
 
 // ─────────────────────────── Router ─────────────────────────────────────
 const routes = {};
@@ -270,6 +212,7 @@ route('main', async () => {
     const card = el(`<button class="card" style="color:${m.color}">
       ${ICONS[m.icon]}<div class="label">${esc(m.title)}</div></button>`);
     card.onclick = () => {
+      if (m.url) { window.open(m.url,'_blank') || (location.href = m.url); return; }
       if (m.cat==='privado') return go('privado');
       if (m.cat==='convenio') return go('convenio');
       if (m.cat==='calendarios') return go('calendarios');
@@ -277,17 +220,6 @@ route('main', async () => {
     };
     grid.appendChild(card);
   });
-
-  // Carpetas personalizadas (creadas desde Privado). Visibles para todos.
-  try {
-    const folders = await SB.getFolders();
-    folders.forEach(f => {
-      const card = el(`<button class="card" style="color:var(--gris)">
-        ${folderIcon(f.title)}<div class="label">${esc(f.title)}</div></button>`);
-      card.onclick = () => go('list', { cat:f.cat_key, title:f.title });
-      grid.appendChild(card);
-    });
-  } catch(e){ console.warn('folders', e); }
 
   // Actividad reciente
   try {
@@ -331,11 +263,9 @@ async function loadRecent(){
 // ─────────────────────────── Pantalla LISTA genérica ────────────────────
 route('list', async (params) => {
   const cat = params?.cat || 'quejas';
-  const customTitle = params?.title;
-  const meta = CAT_META[cat] || { name: customTitle || cat.toUpperCase() };
-  const titulo = customTitle || (meta.name.charAt(0)+meta.name.slice(1).toLowerCase());
+  const meta = CAT_META[cat] || { name:cat.toUpperCase() };
   const node = el(`<div class="screen">
-    <div class="appbar"><button id="back">‹</button><h1>${esc(titulo)}</h1></div>
+    <div class="appbar"><button id="back">‹</button><h1>${esc(meta.name.charAt(0)+meta.name.slice(1).toLowerCase())}</h1></div>
     <div class="content" id="list"><div class="loading-full"><div class="spinner dark"></div></div></div>
   </div>`);
   render(node);
@@ -359,47 +289,22 @@ route('list', async (params) => {
   }
   await reload();
 
-  // FAB para añadir (quejas: todos; resto: solo modo gestión)
-  if (canManage(cat)) {
-    const fab = el(`<button class="fab">＋</button>`);
-    fab.onclick = () => openAddModal(cat, reload);
-    node.appendChild(fab);
-  }
+  // FAB para añadir
+  const fab = el(`<button class="fab">＋</button>`);
+  fab.onclick = () => openAddModal(cat, reload);
+  node.appendChild(fab);
 });
 
-// Resalta en amarillo las apariciones de `term` dentro de un texto,
-// respetando tildes (busca sin tilde pero marca el texto original).
-function highlightText(text, term){
-  const safe = esc(text || '');
-  if (!term) return safe;
-  const norm = s => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
-  const nText = norm(safe);
-  const nTerm = norm(term.trim());
-  if (!nTerm) return safe;
-  let out = '', i = 0;
-  while (i < safe.length) {
-    const idx = nText.indexOf(nTerm, i);
-    if (idx === -1) { out += safe.slice(i); break; }
-    out += safe.slice(i, idx);
-    out += '<mark class="hl">' + safe.slice(idx, idx + nTerm.length) + '</mark>';
-    i = idx + nTerm.length;
-  }
-  return out;
-}
-
-function renderItem(r, cat, reload, highlight=''){
-  const puedeBorrar = canDelete(cat);
-  const titleHtml = highlight ? highlightText(r.title||'(sin título)', highlight) : esc(r.title||'(sin título)');
-  const bodyHtml  = highlight ? highlightText(r.body||'', highlight) : esc(r.body||'');
+function renderItem(r, cat, reload){
   const item = el(`<div class="item">
-    ${puedeBorrar?`<button class="it-del">Borrar</button>`:''}
+    ${Auth.isAdmin?`<button class="it-del">Borrar</button>`:''}
     <div class="it-cat">${catLabel(cat)}</div>
-    <div class="it-title">${titleHtml}</div>
-    ${r.body?`<div class="it-body">${bodyHtml}</div>`:''}
+    <div class="it-title">${esc(r.title||'(sin título)')}</div>
+    ${r.body?`<div class="it-body">${esc(r.body)}</div>`:''}
     ${r.file_url?`<a class="it-file" href="${esc(r.file_url)}" target="_blank" rel="noopener">📎 ${esc(r.file_name||'Ver archivo')}</a>`:''}
     <div class="it-date">${esc(r.date_text||'')} ${r.uploader?'· '+esc(r.uploader):''}</div>
   </div>`);
-  if (puedeBorrar) {
+  if (Auth.isAdmin) {
     item.querySelector('.it-del').onclick = async () => {
       if(!confirm('¿Borrar este elemento?')) return;
       try { await SB.del('content_items', `id=eq.${r.id}`); toast('Borrado'); reload(); }
@@ -480,47 +385,21 @@ route('convenio', async () => {
   const node = el(`<div class="screen">
     <div class="appbar"><button id="back">‹</button><h1>Convenio</h1>
       <button id="aiBtn" title="Preguntar a la IA">✨</button></div>
-    <div style="padding:12px 16px 0">
-      <input id="cvSearch" placeholder="🔍 Buscar en el convenio…"
-        style="width:100%;padding:12px 16px;border-radius:20px;border:1px solid var(--outline);
-        background:var(--surface);color:var(--on-bg);font-size:15px">
-    </div>
     <div class="content" id="cont"><div class="loading-full"><div class="spinner dark"></div></div></div>
   </div>`);
   render(node);
   node.querySelector('#back').onclick = () => go('main');
   node.querySelector('#aiBtn').onclick = () => go('ia');
   const cont = node.querySelector('#cont');
-  const search = node.querySelector('#cvSearch');
-
-  let allRows = [];
-  // Normaliza: minúsculas y sin tildes, para que "articulo" encuentre "artículo"
-  const norm = s => (s||'').toLowerCase()
-    .normalize('NFD').replace(/[\u0300-\u036f]/g,'');
-  function paint(filter=''){
-    const q = norm(filter.trim());
-    const rows = q ? allRows.filter(r =>
-      norm(r.title).includes(q) || norm(r.body).includes(q)
-    ) : allRows;
-    cont.innerHTML='';
-    if (!rows.length) {
-      cont.appendChild(el(`<div class="empty">${ICONS.convenio}<p>${q?'Sin resultados para tu búsqueda.':'No hay artículos del convenio aún.'}</p></div>`));
-    } else {
-      const list=el(`<div class="list"></div>`);
-      rows.forEach(r=>list.appendChild(renderItem(r,'convenio',()=>go('convenio'), filter)));
-      cont.appendChild(list);
-    }
-  }
-
   try {
-    allRows = await SB.select('convenio_articulos', `select=*&order=created_at.asc`);
-    paint();
+    const rows = await SB.select('convenio_articulos', `select=*&order=created_at.asc`);
+    cont.innerHTML='';
+    if (!rows.length) cont.appendChild(el(`<div class="empty">${ICONS.convenio}<p>No hay artículos del convenio aún.</p></div>`));
+    else { const list=el(`<div class="list"></div>`);
+      rows.forEach(r=>list.appendChild(renderItem(r,'convenio',()=>go('convenio')))); cont.appendChild(list); }
   } catch(e){ cont.innerHTML=''; cont.appendChild(el(`<div class="empty"><p>Error: ${esc(e.message)}</p></div>`)); }
 
-  let t;
-  search.oninput = () => { clearTimeout(t); t=setTimeout(()=>paint(search.value), 200); };
-
-  if (canManage('convenio')) { const fab=el(`<button class="fab">＋</button>`);
+  if (Auth.isAdmin) { const fab=el(`<button class="fab">＋</button>`);
     fab.onclick=()=>openAddModal('convenio',()=>go('convenio')); node.appendChild(fab); }
 });
 
@@ -609,135 +488,32 @@ route('calendarios', async () => {
   }
   await loadSub();
 
-  if (canManage('calendarios')) { const fab=el(`<button class="fab">＋</button>`);
+  if (Auth.isAdmin) { const fab=el(`<button class="fab">＋</button>`);
     fab.onclick=()=>openAddModal(activeSub,loadSub); node.appendChild(fab); }
 });
 
 // ─────────────────────────── Pantalla PRIVADO ───────────────────────────
 route('privado', async () => {
-  // Si aún no está desbloqueado el modo gestión, pedir la contraseña.
-  if (!Auth.manageMode) {
+  // Solo admin (en Android pide auth; aquí lo limitamos a la matrícula admin)
+  if (!Auth.isAdmin) {
     const node = el(`<div class="screen">
       <div class="appbar"><button id="back">‹</button><h1>Privado</h1></div>
-      <div class="login" style="justify-content:flex-start;padding-top:50px">
-        <div class="biglogo" style="width:80px;height:80px">${ICONS.privado}</div>
-        <h2 style="margin-top:16px">Zona privada</h2>
-        <p>Introduce la contraseña para gestionar el contenido de la app.</p>
-        <input id="pw" type="password" placeholder="Contraseña" autocomplete="off">
-        <div class="err" id="pwErr"></div>
-        <button class="btn" id="pwBtn">Desbloquear</button>
-      </div>
+      <div class="empty" style="margin-top:60px">${ICONS.privado}
+        <p>Esta sección es solo para administración.</p></div>
     </div>`);
-    render(node);
-    node.querySelector('#back').onclick = () => go('main');
-    const inp = node.querySelector('#pw');
-    const err = node.querySelector('#pwErr');
-    inp.focus();
-    const submit = () => {
-      if (Auth.checkPrivadoPassword(inp.value)) {
-        Auth.manageMode = true;
-        toast('Modo gestión activado');
-        go('privado'); // recargar la pantalla ya desbloqueada
-      } else {
-        err.textContent = 'Contraseña incorrecta.';
-        inp.value = '';
-      }
-    };
-    node.querySelector('#pwBtn').onclick = submit;
-    inp.onkeydown = e => { if(e.key==='Enter') submit(); };
-    return;
+    render(node); node.querySelector('#back').onclick=()=>go('main'); return;
   }
-
-  // Ya desbloqueado: mostrar el contenido de Privado + opción de bloquear.
   const node = el(`<div class="screen">
-    <div class="appbar"><button id="back">‹</button><h1>Privado</h1>
-      <button id="lock" title="Bloquear gestión">🔓</button></div>
+    <div class="appbar"><button id="back">‹</button><h1>Privado</h1></div>
     <div class="content" id="cont"><div class="loading-full"><div class="spinner dark"></div></div></div>
   </div>`);
   render(node);
   node.querySelector('#back').onclick=()=>go('main');
-  node.querySelector('#lock').onclick=()=>{
-    Auth.manageMode = false; toast('Gestión bloqueada'); go('main');
-  };
   const cont = node.querySelector('#cont');
   async function reload(){
     try {
       const rows = await SB.select('content_items', `category=eq.privado&select=*&order=created_at.desc`);
       cont.innerHTML='';
-      const info = el(`<div style="padding:14px 16px 0;color:var(--on-var);font-size:14px">
-        ✅ Modo gestión activo. Ya puedes añadir y borrar contenido en todas las secciones.</div>`);
-      cont.appendChild(info);
-
-      // ── Gestor de carpetas de la pantalla de inicio ──
-      const folderBox = el(`<div style="padding:16px">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-          <b style="font-size:16px">Carpetas de inicio</b>
-          <button id="newFolder" class="btn" style="width:auto;padding:8px 16px;font-size:14px">＋ Nueva</button>
-        </div>
-        <div id="folderList"></div>
-      </div>`);
-      cont.appendChild(folderBox);
-      folderBox.querySelector('#newFolder').onclick = () => openNewFolderModal(reload);
-      try {
-        const folders = await SB.getFolders();
-        const fl = folderBox.querySelector('#folderList');
-        if (!folders.length) {
-          fl.appendChild(el(`<div style="color:var(--on-var);font-size:14px">No has creado carpetas aún.</div>`));
-        } else {
-          folders.forEach(f => {
-            const row = el(`<div class="item" style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px">
-              <span style="font-weight:600">${esc(f.title)}</span>
-              <button class="it-del" style="float:none">Borrar</button>
-            </div>`);
-            row.querySelector('.it-del').onclick = async () => {
-              if(!confirm(`¿Borrar la carpeta "${f.title}" y todo su contenido?`)) return;
-              try { await SB.deleteFolder(f.id, f.cat_key); toast('Carpeta borrada'); reload(); }
-              catch(e){ toast('Error al borrar'); }
-            };
-            fl.appendChild(row);
-          });
-        }
-      } catch(e){ console.warn('folders', e); }
-
-      // ── Gestor de matrículas permitidas ──
-      const matBox = el(`<div style="padding:0 16px 16px">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-          <b style="font-size:16px">Matrículas permitidas</b>
-          <button id="newMat" class="btn" style="width:auto;padding:8px 16px;font-size:14px">＋ Añadir</button>
-        </div>
-        <div id="matList"></div>
-      </div>`);
-      cont.appendChild(matBox);
-      matBox.querySelector('#newMat').onclick = () => openNewMatriculaModal(reload);
-      try {
-        const mats = await SB.getMatriculas();
-        const ml = matBox.querySelector('#matList');
-        if (!mats.length) {
-          ml.appendChild(el(`<div style="color:var(--on-var);font-size:14px">No hay matrículas registradas.</div>`));
-        } else {
-          // Mostrarlas como "chips" en una rejilla compacta
-          const wrap = el(`<div style="display:flex;flex-wrap:wrap;gap:8px"></div>`);
-          mats.forEach(m => {
-            const esAdmin = m.matricula === CFG.PERMANENT_MATRICULA;
-            const chip = el(`<div style="display:flex;align-items:center;gap:6px;background:var(--surface-var);
-              padding:6px 10px;border-radius:16px;font-size:14px;font-weight:600">
-              <span>${esc(m.matricula)}</span>
-              ${esAdmin?'':`<button class="matDel" style="color:var(--rojo);font-weight:700;font-size:16px;line-height:1">×</button>`}
-            </div>`);
-            const del = chip.querySelector('.matDel');
-            if (del) del.onclick = async () => {
-              if(!confirm(`¿Quitar la matrícula ${m.matricula}?`)) return;
-              try { await SB.deleteMatricula(m.id); toast('Matrícula eliminada'); reload(); }
-              catch(e){ toast('Error al eliminar'); }
-            };
-            wrap.appendChild(chip);
-          });
-          ml.appendChild(wrap);
-        }
-      } catch(e){ console.warn('matriculas', e); }
-
-      // ── Contenido de la sección Privado ──
-      cont.appendChild(el(`<div class="section-title" style="padding-top:8px">Contenido privado</div>`));
       if(!rows.length) cont.appendChild(el(`<div class="empty">${ICONS.privado}<p>Zona privada vacía.</p></div>`));
       else { const list=el(`<div class="list"></div>`);
         rows.forEach(r=>list.appendChild(renderItem(r,'privado',reload))); cont.appendChild(list); }
@@ -746,65 +522,6 @@ route('privado', async () => {
   await reload();
   const fab=el(`<button class="fab">＋</button>`); fab.onclick=()=>openAddModal('privado',reload); node.appendChild(fab);
 });
-
-// Modal para crear una carpeta nueva
-function openNewFolderModal(reload){
-  const bg = el(`<div class="modal-bg"><div class="modal">
-    <h3>Nueva carpeta</h3>
-    <input id="fName" placeholder="Nombre de la carpeta" autocomplete="off">
-    <div class="err" id="fErr"></div>
-    <div class="modal-actions">
-      <button class="btn btn-sec" id="fCancel">Cancelar</button>
-      <button class="btn" id="fSave">Crear</button>
-    </div>
-  </div></div>`);
-  document.body.appendChild(bg);
-  const close = () => bg.remove();
-  bg.onclick = e => { if(e.target===bg) close(); };
-  bg.querySelector('#fCancel').onclick = close;
-  bg.querySelector('#fName').focus();
-  bg.querySelector('#fSave').onclick = async () => {
-    const name = bg.querySelector('#fName').value.trim();
-    const err = bg.querySelector('#fErr');
-    if (name.length < 2) { err.textContent='Escribe un nombre.'; return; }
-    const btn = bg.querySelector('#fSave');
-    btn.disabled=true; btn.innerHTML='<span class="spinner"></span>';
-    try { await SB.createFolder(name); toast('Carpeta creada'); close(); reload(); }
-    catch(e){ err.textContent='Error: '+e.message; btn.disabled=false; btn.textContent='Crear'; }
-  };
-}
-
-// Modal para añadir una matrícula nueva
-function openNewMatriculaModal(reload){
-  const bg = el(`<div class="modal-bg"><div class="modal">
-    <h3>Añadir matrícula</h3>
-    <input id="mName" inputmode="numeric" placeholder="Número de matrícula" autocomplete="off">
-    <div class="err" id="mErr"></div>
-    <div class="modal-actions">
-      <button class="btn btn-sec" id="mCancel">Cancelar</button>
-      <button class="btn" id="mSave">Añadir</button>
-    </div>
-  </div></div>`);
-  document.body.appendChild(bg);
-  const close = () => bg.remove();
-  bg.onclick = e => { if(e.target===bg) close(); };
-  bg.querySelector('#mCancel').onclick = close;
-  bg.querySelector('#mName').focus();
-  bg.querySelector('#mSave').onclick = async () => {
-    const val = bg.querySelector('#mName').value.trim();
-    const err = bg.querySelector('#mErr');
-    if (val.length < 1) { err.textContent='Escribe una matrícula.'; return; }
-    const btn = bg.querySelector('#mSave');
-    btn.disabled=true; btn.innerHTML='<span class="spinner"></span>';
-    try { await SB.addMatricula(val); toast('Matrícula añadida'); close(); reload(); }
-    catch(e){
-      // Si ya existe (UNIQUE), avisar amablemente
-      const msg = e.message.includes('409') || e.message.includes('duplicate')
-        ? 'Esa matrícula ya estaba registrada.' : 'Error: '+e.message;
-      err.textContent = msg; btn.disabled=false; btn.textContent='Añadir';
-    }
-  };
-}
 
 // ─────────────────────────── Arranque ───────────────────────────────────
 if (CFG.SUPABASE_URL.includes('REEMPLAZAR')) {
