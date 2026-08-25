@@ -322,14 +322,25 @@ async function loadRecent(){
 route('list', async (params) => {
   const cat = params?.cat || 'quejas';
   const customTitle = params?.title;
+  // fromManage=true solo cuando se abre desde la zona Privado.
+  const fromManage = params?.manage === true;
+  const isCustom = cat.startsWith('custom_');
   const meta = CAT_META[cat] || { name: customTitle || cat.toUpperCase() };
   const titulo = customTitle || (meta.name.charAt(0)+meta.name.slice(1).toLowerCase());
+
+  // ¿Se puede gestionar (añadir/borrar) en esta pantalla?
+  //  - Carpetas personalizadas: SOLO si vienes desde Privado (fromManage).
+  //    Desde la pantalla principal son siempre solo lectura.
+  //  - Categorías normales: según los permisos de siempre.
+  const permitirAdd = isCustom ? (fromManage && Auth.manageMode) : canAdd(cat);
+  const permitirDel = isCustom ? (fromManage && Auth.manageMode) : canDelete(cat);
+
   const node = el(`<div class="screen">
     <div class="appbar"><button id="back">‹</button><h1>${esc(titulo)}</h1></div>
     <div class="content" id="list"><div class="loading-full"><div class="spinner dark"></div></div></div>
   </div>`);
   render(node);
-  node.querySelector('#back').onclick = () => go('main');
+  node.querySelector('#back').onclick = () => fromManage ? go('privado') : go('main');
   const cont = node.querySelector('#list');
 
   async function reload(){
@@ -340,7 +351,7 @@ route('list', async (params) => {
         cont.appendChild(el(`<div class="empty">${ICONS[catIcon(cat)]||ICONS.contactos}<p>Todavía no hay nada aquí.</p></div>`));
       } else {
         const list = el(`<div class="list"></div>`);
-        rows.forEach(r => list.appendChild(renderItem(r, cat, reload)));
+        rows.forEach(r => list.appendChild(renderItem(r, cat, reload, '', permitirDel)));
         cont.appendChild(list);
       }
     } catch(e){
@@ -349,16 +360,16 @@ route('list', async (params) => {
   }
   await reload();
 
-  // FAB para añadir (quejas/pic: todos; resto: solo modo gestión)
-  if (canAdd(cat)) {
+  // FAB para añadir
+  if (permitirAdd) {
     const fab = el(`<button class="fab">＋</button>`);
     fab.onclick = () => openAddModal(cat, reload);
     node.appendChild(fab);
   }
 });
 
-function renderItem(r, cat, reload, highlight=''){
-  const puedeBorrar = canDelete(cat);
+function renderItem(r, cat, reload, highlight='', forceDelete=null){
+  const puedeBorrar = (forceDelete !== null) ? forceDelete : canDelete(cat);
   const titleHtml = highlight ? highlightText(r.title||'(sin título)', highlight) : esc(r.title||'(sin título)');
   const bodyHtml  = highlight ? highlightText(r.body||'', highlight) : esc(r.body||'');
   const item = el(`<div class="item">
@@ -672,10 +683,17 @@ route('privado', async () => {
           fl.appendChild(el(`<div style="color:var(--on-var);font-size:14px">No has creado carpetas aún.</div>`));
         } else {
           folders.forEach(f => {
-            const row = el(`<div class="item" style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px">
-              <span style="font-weight:600">${esc(f.title)}</span>
-              <button class="it-del" style="float:none">Borrar</button>
+            const row = el(`<div class="item" style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;gap:10px">
+              <button class="folderOpen" style="display:flex;align-items:center;gap:10px;flex:1;text-align:left;min-width:0">
+                <span style="width:32px;height:32px;flex-shrink:0">${folderIcon(f.title)}</span>
+                <span style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(f.title)}</span>
+                <span style="color:var(--on-var);font-size:13px;flex-shrink:0">›</span>
+              </button>
+              <button class="it-del" style="float:none;flex-shrink:0">Borrar</button>
             </div>`);
+            // Tocar la carpeta → entrar a ver/gestionar su contenido (modo gestión)
+            row.querySelector('.folderOpen').onclick = () => go('list', { cat:f.cat_key, title:f.title, manage:true });
+            // Botón Borrar → borra la carpeta entera
             row.querySelector('.it-del').onclick = async () => {
               if(!confirm(`¿Borrar la carpeta "${f.title}" y todo su contenido?`)) return;
               try { await SB.deleteFolder(f.id, f.cat_key); toast('Carpeta borrada'); reload(); }
