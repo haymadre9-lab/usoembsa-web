@@ -1,5 +1,4 @@
-// Iconos SVG con gradientes y relieve, equivalentes a los de la app Android.
-// Cada función devuelve un string SVG de 48x48 (escalable).
+// Iconos SVG con gradientes y relieve.
 window.ICONS = {
   // ─── Iconos temáticos para carpetas personalizadas ───
   manual: `<svg viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
@@ -10,14 +9,12 @@ window.ICONS = {
     <path fill="#ffffff3d" d="M10 8h26a3 3 0 0 1 3 3v3H10z"/>
     <path fill="#1A237E" d="M10 8h4v34h-2a2 2 0 0 1-2-2z"/>
     <path fill="#fff" d="M16 13h19v26H16z"/>
-    <!-- bus grande y claro dentro del libro -->
     <path fill="#1E88E5" d="M19 20h13a1.5 1.5 0 0 1 1.5 1.5v8a1.5 1.5 0 0 1-1.5 1.5H19a1.5 1.5 0 0 1-1.5-1.5v-8A1.5 1.5 0 0 1 19 20z"/>
     <path fill="#ffffff3d" d="M19 20h13a1.5 1.5 0 0 1 1.5 1.5v1H17.5v-1A1.5 1.5 0 0 1 19 20z"/>
     <path fill="#BBDEFB" d="M19 23h5v3.5h-5zM25.5 23h6v3.5h-6z"/>
     <path fill="#0D47A1" d="M18 27h15v1.5H18z"/>
     <circle cx="21.5" cy="31" r="1.6" fill="#212121"/><circle cx="29.5" cy="31" r="1.6" fill="#212121"/>
     <circle cx="21.5" cy="31" r=".6" fill="#fff"/><circle cx="29.5" cy="31" r=".6" fill="#fff"/>
-    <!-- líneas de texto del manual -->
     <path stroke="#90A4AE" stroke-width="1.2" d="M19 35.5h13M19 37.5h9"/>
   </svg>`,
 
@@ -39,7 +36,6 @@ window.ICONS = {
       <stop offset="0" stop-color="#66BB6A"/><stop offset="1" stop-color="#2E7D32"/></linearGradient>
       <linearGradient id="sv2" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0" stop-color="#FFB74D"/><stop offset="1" stop-color="#E65100"/></linearGradient></defs>
-    <!-- bus que lleva a casa -->
     <path fill="url(#sv1)" d="M5 20a3 3 0 0 1 3-3h20a3 3 0 0 1 3 3v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2z"/>
     <path fill="#ffffff33" d="M5 20a3 3 0 0 1 3-3h20a3 3 0 0 1 3 3v2H5z"/>
     <path fill="#C8E6C9" d="M7 19h9v6H7zM18 19h11v6H18z"/>
@@ -49,7 +45,6 @@ window.ICONS = {
     <circle cx="11" cy="37" r="2.6" fill="#212121"/><circle cx="11" cy="37" r="1" fill="#9E9E9E"/>
     <circle cx="27" cy="37" r="2.6" fill="#212121"/><circle cx="27" cy="37" r="1" fill="#9E9E9E"/>
     <circle cx="6" cy="30" r="1" fill="#FFEB3B"/>
-    <!-- casa encima/al lado -->
     <path fill="url(#sv2)" d="M37 18l8 7h-2v11h-12V25h-2z"/>
     <path fill="#5D4037" d="M33 27h5v9h-5z"/>
     <path fill="#FFE0B2" d="M40 28h2.5v3H40z"/>
